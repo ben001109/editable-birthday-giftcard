@@ -1,4 +1,4 @@
-import { firebaseConfig, clerkPublishableKey } from './config.js';
+import { firebaseConfig } from './config.js';
 
 // 引入 Firebase SDK (CDN)
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
@@ -16,7 +16,12 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { 
   getAuth, 
-  signInWithCustomToken 
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 
 // ==========================================================================
@@ -68,7 +73,7 @@ function initFirebase() {
 // 顯示離線模式提示徽章
 function showOfflineBadge() {
   const badge = document.getElementById('offline-badge');
-  if (badge) return; // 避免重複建立
+  if (badge) return;
   
   const newBadge = document.createElement('div');
   newBadge.id = 'offline-badge';
@@ -90,72 +95,140 @@ function showOfflineBadge() {
 }
 
 // ==========================================================================
-// Clerk 身份驗證初始化與整合 (Clerk Auth Integration)
+// Firebase Authentication 驗證與整合 (Firebase Auth Native Integration)
 // ==========================================================================
-function initClerkAuth() {
-  const isPlaceholderClerkKey = !clerkPublishableKey || clerkPublishableKey.includes('YOUR_CLERK_PUBLISHABLE_KEY');
-
-  if (isPlaceholderClerkKey) {
-    console.warn('⚠️ Clerk Publishable Key 尚未配置。創作者後台將跳過登入，直接以離線模式啟用編輯器。');
-    // 離線模式直接顯示編輯器
+function initFirebaseAuth() {
+  if (offlineMode || !auth) {
+    // 離線模式直接顯示編輯器，隱藏後台與認證
     document.getElementById('creator-view').classList.remove('hidden');
-    document.getElementById('creator-dashboard').classList.add('hidden'); // 隱藏無效的後台
+    document.getElementById('creator-dashboard').classList.add('hidden');
+    document.querySelector('.nav-actions').style.display = 'none';
     setupCreator();
     return;
   }
 
-  // 輪詢等待 window.Clerk 載入完畢
-  const checkClerkInterval = setInterval(async () => {
-    if (window.Clerk) {
-      clearInterval(checkClerkInterval);
-      try {
-        await window.Clerk.load({ publishableKey: clerkPublishableKey });
-        
-        // 監聽登入狀態改變
-        window.Clerk.addListener(async ({ user }) => {
-          if (user) {
-            // 已登入
-            document.getElementById('auth-view').classList.add('hidden');
-            document.getElementById('creator-view').classList.remove('hidden');
-            
-            // 載入 Clerk 使用者按鈕
-            window.Clerk.mountUserButton(document.getElementById('clerk-user-button-mount'));
-            
-            // 同步 Firebase 認證 (利用 Clerk 的 Firebase 整合)
-            if (!offlineMode && auth) {
-              try {
-                const firebaseToken = await window.Clerk.session.getToken({ template: 'firebase' });
-                if (firebaseToken) {
-                  await signInWithCustomToken(auth, firebaseToken);
-                  console.log('🔥 Clerk 成功同步簽發 Firebase Auth 憑證！');
-                } else {
-                  console.warn('⚠️ 未取得 Clerk 的 Firebase token，請確認 Clerk Integrations 中已啟用 Firebase 整合。');
-                }
-              } catch (authSyncError) {
-                console.error('Clerk 同步 Firebase Auth 失敗:', authSyncError);
-              }
-            }
+  // 監聽 Firebase Auth 登入狀態變更
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      // 使用者已登入
+      document.getElementById('auth-view').classList.add('hidden');
+      document.getElementById('creator-view').classList.remove('hidden');
+      
+      // 顯示用戶 Email 資訊，並綁定登出
+      document.getElementById('user-display-email').textContent = user.email || '已登入用戶';
+      document.getElementById('auth-signout-btn').onclick = async () => {
+        showLoading(true);
+        await signOut(auth);
+        window.location.reload();
+      };
 
-            // 載入創作者管理後台 (Dashboard)
-            loadCreatorDashboard(user.id);
-            setupCreator(user.id);
-          } else {
-            // 未登入
-            document.getElementById('creator-view').classList.add('hidden');
-            document.getElementById('auth-view').classList.remove('hidden');
-            
-            // 載入 Clerk Sign In 元件
-            window.Clerk.mountSignIn(document.getElementById('clerk-sign-in-mount'), {
-              afterSignInUrl: window.location.href,
-              afterSignUpUrl: window.location.href
-            });
-          }
-        });
-      } catch (err) {
-        console.error('Clerk 載入錯誤:', err);
-      }
+      // 載入個人後台 (Dashboard) 與編輯器
+      loadCreatorDashboard(user.uid);
+      setupCreator(user.uid);
+    } else {
+      // 使用者未登入
+      document.getElementById('creator-view').classList.add('hidden');
+      document.getElementById('auth-view').classList.remove('hidden');
+      
+      setupAuthForm();
     }
-  }, 100);
+  });
+}
+
+// 設定原生登入/註冊表單監聽器
+function setupAuthForm() {
+  const tabLogin = document.getElementById('tab-login');
+  const tabSignup = document.getElementById('tab-signup');
+  const authForm = document.getElementById('email-auth-form');
+  const emailInput = document.getElementById('auth-email');
+  const passwordInput = document.getElementById('auth-password');
+  const errorMsgDiv = document.getElementById('auth-error-msg');
+  const submitBtn = document.getElementById('auth-submit-btn');
+  const googleBtn = document.getElementById('google-auth-btn');
+
+  let mode = 'login'; // 'login' 或 'signup'
+
+  // 切換為登入
+  tabLogin.onclick = () => {
+    mode = 'login';
+    tabLogin.classList.add('active');
+    tabSignup.classList.remove('active');
+    submitBtn.textContent = '登入帳號';
+    errorMsgDiv.classList.add('hidden');
+  };
+
+  // 切換為註冊
+  tabSignup.onclick = () => {
+    mode = 'signup';
+    tabSignup.classList.add('active');
+    tabLogin.classList.remove('active');
+    submitBtn.textContent = '註冊並登入';
+    errorMsgDiv.classList.add('hidden');
+  };
+
+  // 錯誤處理訊息中文化
+  function getFriendlyErrorMessage(code) {
+    switch (code) {
+      case 'auth/invalid-email':
+        return '❌ 無效的電子郵件格式。';
+      case 'auth/user-disabled':
+        return '❌ 該帳號已被停用。';
+      case 'auth/user-not-found':
+      case 'auth/wrong-password':
+      case 'auth/invalid-credential':
+        return '❌ 電子郵件或密碼錯誤。';
+      case 'auth/email-already-in-use':
+        return '❌ 該電子郵件已被註冊使用。';
+      case 'auth/weak-password':
+        return '❌ 密碼強度不足，請輸入至少 6 位數。';
+      case 'auth/popup-closed-by-user':
+        return '❌ Google 登入視窗已被關閉。';
+      default:
+        return `❌ 發生錯誤 (代碼: ${code})，請稍後再試。`;
+    }
+  }
+
+  // 遞交表單
+  authForm.onsubmit = async (e) => {
+    e.preventDefault();
+    errorMsgDiv.classList.add('hidden');
+    showLoading(true);
+
+    const email = emailInput.value;
+    const password = passwordInput.value;
+
+    try {
+      if (mode === 'signup') {
+        // 原生註冊
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        // 原生登入
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    } catch (err) {
+      console.error('Email 認證錯誤:', err);
+      errorMsgDiv.textContent = getFriendlyErrorMessage(err.code);
+      errorMsgDiv.classList.remove('hidden');
+    } finally {
+      showLoading(false);
+    }
+  };
+
+  // Google 一鍵登入
+  googleBtn.onclick = async () => {
+    errorMsgDiv.classList.add('hidden');
+    showLoading(true);
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (err) {
+      console.error('Google 登入錯誤:', err);
+      errorMsgDiv.textContent = getFriendlyErrorMessage(err.code);
+      errorMsgDiv.classList.remove('hidden');
+    } finally {
+      showLoading(false);
+    }
+  };
 }
 
 // 載入創作者的賀卡 Dashboard
@@ -269,7 +342,7 @@ async function loadCreatorDashboard(creatorId) {
         if (confirm('確定要永久刪除此生日賀卡嗎？刪除後連結將立即失效，且無法復原。')) {
           try {
             await deleteDoc(doc(db, 'cards', id));
-            playPopSound(); // 播放刪除氣球般的聲音
+            playPopSound();
             confetti({
               particleCount: 50,
               spread: 60,
@@ -500,7 +573,7 @@ function setupCreator(creatorId = null) {
       customMusicUrl: musicInput.value === 'music-custom' ? customMusicUrl.value : '',
       createdAt: new Date().getTime(),
       expiresAt: expiresAtDate ? expiresAtDate.getTime() : null,
-      creatorId: creatorId // 綁定創作者 ID (Clerk 提供)
+      creatorId: creatorId // 綁定創作者 ID (Firebase Auth 提供)
     };
 
     let shareUrl = '';
@@ -720,7 +793,7 @@ function renderViewerStage() {
   document.getElementById('viewer-scratch-prize').textContent = currentCardData.scratchPrize || '神秘驚喜！';
 
   document.getElementById('creator-view').classList.add('hidden');
-  document.getElementById('auth-view').classList.add('hidden'); // 確保觀看時遮罩隱藏
+  document.getElementById('auth-view').classList.add('hidden');
   document.getElementById('viewer-view').classList.remove('hidden');
 
   createBackgroundParticles();
@@ -883,12 +956,10 @@ function setupStepNavigation() {
     stopBalloonSpawner();
     stopMicDetection();
 
-    // 移除 URL 參數，返回主畫面 (Clerk 登入首頁/Dashboard)
+    // 移除 URL 參數，返回主畫面 (Firebase 登入首頁/Dashboard)
     window.history.pushState({}, document.title, window.location.pathname);
     
     document.getElementById('viewer-view').classList.add('hidden');
-    
-    // 重新載入，讓 Clerk 判定登入狀態
     window.location.reload();
   };
 }
@@ -1263,7 +1334,7 @@ function showExpiredScreen(customMsg) {
   document.getElementById('expired-create-btn').onclick = () => {
     expired.classList.add('hidden');
     window.history.pushState({}, document.title, window.location.pathname);
-    window.location.reload(); // 重新整理，進入登入或Dashboard
+    window.location.reload();
   };
 }
 
@@ -1284,8 +1355,8 @@ window.addEventListener('DOMContentLoaded', () => {
     // A. 「收件人模式」：完全略過登入，直接開啟賀卡
     loadCardViewer(cardId, compressedData);
   } else {
-    // B. 「創作者模式」：需要透過 Clerk 登入
+    // B. 「創作者模式」：需要登入
     showLoading(false);
-    initClerkAuth();
+    initFirebaseAuth();
   }
 });

@@ -14,8 +14,6 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- LZ-String URL Compression CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
-  <!-- Clerk SDK CDN -->
-  <script async crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js" type="text/javascript"></script>
   <!-- Core Stylesheet -->
   <link rel="stylesheet" href="style.css">
 </head>
@@ -56,7 +54,35 @@
           <div class="feature-item"><span class="feature-icon">⏳</span> <span>整合 Firebase 設定 3/5/7 天後自動銷毀</span></div>
         </div>
 
-        <div id="clerk-sign-in-mount"></div>
+        <!-- Firebase Auth 原生登入註冊卡片 -->
+        <div class="auth-card">
+          <div class="auth-tabs">
+            <button id="tab-login" class="auth-tab active">帳號登入</button>
+            <button id="tab-signup" class="auth-tab">免費註冊</button>
+          </div>
+          
+          <form id="email-auth-form" class="email-auth-form">
+            <div class="form-group">
+              <label for="auth-email">電子郵件 (Email)</label>
+              <input type="email" id="auth-email" required placeholder="example@email.com">
+            </div>
+            <div class="form-group">
+              <label for="auth-password">密碼 (Password)</label>
+              <input type="password" id="auth-password" required placeholder="請輸入 6 位數以上密碼">
+            </div>
+            <div id="auth-error-msg" class="auth-error-msg hidden"></div>
+            <button type="submit" id="auth-submit-btn" class="btn btn-submit-card">登入帳號</button>
+          </form>
+
+          <div class="auth-divider">
+            <span>或</span>
+          </div>
+
+          <button id="google-auth-btn" class="btn btn-secondary google-btn">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" alt="Google Logo" class="google-logo-img">
+            使用 Google 帳號一鍵登入
+          </button>
+        </div>
       </div>
     </div>
 
@@ -67,7 +93,8 @@
       <nav class="navbar card-glass">
         <div class="logo">🎉 <span>B-Day Giftcard</span></div>
         <div class="nav-actions">
-          <div id="clerk-user-button-mount"></div>
+          <span id="user-display-email" class="user-display-email"></span>
+          <button id="auth-signout-btn" class="btn btn-secondary btn-sm"><i data-lucide="log-out"></i> 登出</button>
         </div>
       </nav>
 
