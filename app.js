@@ -113,29 +113,26 @@ function initClerkAuth() {
           
           let supabaseClient = null;
           if (!offlineMode) {
-            try {
-              // 使用 Supabase 原生 Clerk 第三方驗證 (Native Third-Party Auth)
-              // 不需要 JWT Template，直接用 Clerk 的原生 session token
-              // Supabase 會透過 Clerk JWKS 端點自動驗證 ES256 簽名
-              const token = await window.Clerk.session.getToken();
-              
-              if (token) {
-                // 初始化帶有 Clerk JWT 認證的 Supabase 安全客戶端
-                supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey, {
-                  global: {
-                    headers: {
-                      Authorization: `Bearer ${token}`
+            // 使用動態 fetch 攔截器，每次請求都取得最新的 Clerk token
+            // 避免 token 因填寫表單時間過長而過期 (JWT expired)
+            supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey, {
+              global: {
+                fetch: async (url, options = {}) => {
+                  try {
+                    const freshToken = await window.Clerk.session?.getToken();
+                    const headers = new Headers(options?.headers);
+                    if (freshToken) {
+                      headers.set('Authorization', `Bearer ${freshToken}`);
                     }
+                    return fetch(url, { ...options, headers });
+                  } catch (e) {
+                    // 若取不到 token，以原始 options 繼續（匿名模式）
+                    return fetch(url, options);
                   }
-                });
-              } else {
-                console.warn('⚠️ 未取得 Clerk token，將以匿名模式存取 Supabase。');
-                supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+                }
               }
-            } catch (jwtError) {
-              console.error('取得 Clerk Token 失敗:', jwtError);
-              supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
-            }
+            });
+            console.log('✅ Supabase 動態 Token 客戶端已就緒');
           }
 
           // 載入創作者管理後台 (Dashboard)
