@@ -912,19 +912,21 @@ p {
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 3;
+  z-index: 5;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
   padding: 30px;
-  background: linear-gradient(to bottom, transparent 40%, rgba(255, 255, 255, 0.95) 100%);
+  /* 頂部透明使三角形蓋子的形狀依然透出，下方白底保護收件人文字可讀 */
+  background: linear-gradient(to bottom, transparent 48%, rgba(255, 255, 255, 0.95) 100%);
   border-radius: 12px;
+  pointer-events: none;
 }
 
 .envelope-seal-3d {
-  width: 60px;
-  height: 60px;
+  width: 64px;
+  height: 64px;
   background: var(--theme-card-bg);
   border: 3px solid var(--theme-primary);
   color: var(--theme-primary);
@@ -933,9 +935,12 @@ p {
   align-items: center;
   justify-content: center;
   font-size: 1.8rem;
-  box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+  /* 蠟章定位在三角蓋子中央接縫處，有如封蠟黏著信封 */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.18), 0 0 0 4px rgba(255,255,255,0.6);
   margin-bottom: 20px;
-  z-index: 5;
+  position: relative;
+  z-index: 10;
+  pointer-events: auto;
   transition: transform 0.3s ease;
 }
 
