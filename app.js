@@ -1,34 +1,8 @@
-import { firebaseConfig } from './config.js';
-
-// 引入 Firebase SDK (CDN)
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  getDoc, 
-  doc, 
-  Timestamp,
-  query,
-  where,
-  getDocs,
-  deleteDoc
-} from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-import { 
-  getAuth, 
-  onAuthStateChanged,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithPopup,
-  signOut
-} from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+import { supabaseUrl, supabaseAnonKey, clerkPublishableKey } from './config.js';
 
 // ==========================================================================
 // 全域狀態管理與設定 (Global State & Settings)
 // ==========================================================================
-let db = null;
-let auth = null;
 let offlineMode = false;
 let currentCardData = null;
 let audioContext = null;
@@ -46,27 +20,18 @@ const MUSIC_SOURCES = {
 };
 
 // ==========================================================================
-// 初始化 Firebase / 離線模式判定 (Initialize Firebase)
+// 初始化 Supabase / 離線模式判定 (Initialize Supabase)
 // ==========================================================================
-function initFirebase() {
-  const isPlaceholderKey = !firebaseConfig.apiKey || firebaseConfig.apiKey.includes('YOUR_API_KEY');
+function initSupabaseCheck() {
+  const isPlaceholderKey = !supabaseUrl || supabaseUrl.includes('YOUR_SUPABASE_URL') || !supabaseAnonKey || supabaseAnonKey.includes('YOUR_SUPABASE_ANON_KEY');
   
   if (isPlaceholderKey) {
-    console.warn('⚠️ Firebase API 金鑰尚未配置。系統已自動啟動「離線 URL 壓縮分享模式」。');
+    console.warn('⚠️ Supabase URL 或 Anon Key 尚未配置。系統已自動啟動「離線 URL 壓縮分享模式」。');
     offlineMode = true;
     showOfflineBadge();
   } else {
-    try {
-      const app = initializeApp(firebaseConfig);
-      db = getFirestore(app);
-      auth = getAuth(app);
-      offlineMode = false;
-      console.log('⚡ Firebase Firestore & Auth 初始化成功！賀卡將儲存於雲端資料庫。');
-    } catch (error) {
-      console.error('❌ Firebase 初始化失敗，切換為離線模式:', error);
-      offlineMode = true;
-      showOfflineBadge();
-    }
+    offlineMode = false;
+    console.log('⚡ Supabase 模組已就緒！');
   }
 }
 
@@ -95,11 +60,13 @@ function showOfflineBadge() {
 }
 
 // ==========================================================================
-// Firebase Authentication 驗證與整合 (Firebase Auth Native Integration)
+// Clerk 身份驗證初始化與整合 (Clerk Auth Integration)
 // ==========================================================================
-function initFirebaseAuth() {
-  if (offlineMode || !auth) {
-    // 離線模式直接顯示編輯器，隱藏後台與認證
+function initClerkAuth() {
+  const isPlaceholderClerkKey = !clerkPublishableKey || clerkPublishableKey.includes('YOUR_CLERK_PUBLISHABLE_KEY');
+
+  if (isPlaceholderClerkKey) {
+    console.warn('⚠️ Clerk Publishable Key 尚未配置。創作者後台將跳過登入，直接以離線模式啟用編輯器。');
     document.getElementById('creator-view').classList.remove('hidden');
     document.getElementById('creator-dashboard').classList.add('hidden');
     document.querySelector('.nav-actions').style.display = 'none';
@@ -107,136 +74,81 @@ function initFirebaseAuth() {
     return;
   }
 
-  // 監聽 Firebase Auth 登入狀態變更
-  onAuthStateChanged(auth, (user) => {
-    if (user) {
-      // 使用者已登入
-      document.getElementById('auth-view').classList.add('hidden');
-      document.getElementById('creator-view').classList.remove('hidden');
-      
-      // 顯示用戶 Email 資訊，並綁定登出
-      document.getElementById('user-display-email').textContent = user.email || '已登入用戶';
-      document.getElementById('auth-signout-btn').onclick = async () => {
-        showLoading(true);
-        await signOut(auth);
-        window.location.reload();
-      };
+  // 動態載入 Clerk SDK 腳本以防止 Missing publishableKey 報錯
+  const script = document.createElement('script');
+  script.src = "https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";
+  script.async = true;
+  script.crossOrigin = "anonymous";
+  script.setAttribute('data-clerk-publishable-key', clerkPublishableKey);
 
-      // 載入個人後台 (Dashboard) 與編輯器
-      loadCreatorDashboard(user.uid);
-      setupCreator(user.uid);
-    } else {
-      // 使用者未登入
-      document.getElementById('creator-view').classList.add('hidden');
-      document.getElementById('auth-view').classList.remove('hidden');
+  script.onload = async () => {
+    try {
+      await window.Clerk.load();
       
-      setupAuthForm();
+      // 監聽登入狀態改變
+      window.Clerk.addListener(async ({ user }) => {
+        if (user) {
+          // 已登入
+          document.getElementById('auth-view').classList.add('hidden');
+          document.getElementById('creator-view').classList.remove('hidden');
+          
+          // 載入 Clerk 使用者頭像/按鈕
+          window.Clerk.mountUserButton(document.getElementById('clerk-user-button-mount'));
+          
+          let supabaseClient = null;
+          if (!offlineMode) {
+            try {
+              // 取得 Clerk 為 Supabase 簽發的安全 JWT Token
+              const token = await window.Clerk.session.getToken({ template: 'supabase' });
+              
+              if (token) {
+                // 初始化帶有 Clerk JWT 認證的 Supabase 安全客戶端
+                supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey, {
+                  global: {
+                    headers: {
+                      Authorization: `Bearer ${token}`
+                    }
+                  }
+                });
+              } else {
+                console.warn('⚠️ 未取得 Clerk 的 Supabase token，將以匿名模式存取 Supabase（可能因未在 Clerk 後台建立 Supabase 模板）。');
+                supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+              }
+            } catch (jwtError) {
+              console.error('取得 Clerk Supabase Token 失敗:', jwtError);
+              supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+            }
+          }
+
+          // 載入創作者管理後台 (Dashboard)
+          loadCreatorDashboard(supabaseClient, user.id);
+          setupCreator(supabaseClient, user.id);
+        } else {
+          // 未登入
+          document.getElementById('creator-view').classList.add('hidden');
+          document.getElementById('auth-view').classList.remove('hidden');
+          
+          // 載入 Clerk Sign In 面板
+          window.Clerk.mountSignIn(document.getElementById('clerk-sign-in-mount'), {
+            afterSignInUrl: window.location.href,
+            afterSignUpUrl: window.location.href
+          });
+        }
+      });
+    } catch (err) {
+      console.error('Clerk 載入或初始化錯誤:', err);
     }
-  });
+  };
+
+  document.body.appendChild(script);
 }
 
-// 設定原生登入/註冊表單監聽器
-function setupAuthForm() {
-  const tabLogin = document.getElementById('tab-login');
-  const tabSignup = document.getElementById('tab-signup');
-  const authForm = document.getElementById('email-auth-form');
-  const emailInput = document.getElementById('auth-email');
-  const passwordInput = document.getElementById('auth-password');
-  const errorMsgDiv = document.getElementById('auth-error-msg');
-  const submitBtn = document.getElementById('auth-submit-btn');
-  const googleBtn = document.getElementById('google-auth-btn');
-
-  let mode = 'login'; // 'login' 或 'signup'
-
-  // 切換為登入
-  tabLogin.onclick = () => {
-    mode = 'login';
-    tabLogin.classList.add('active');
-    tabSignup.classList.remove('active');
-    submitBtn.textContent = '登入帳號';
-    errorMsgDiv.classList.add('hidden');
-  };
-
-  // 切換為註冊
-  tabSignup.onclick = () => {
-    mode = 'signup';
-    tabSignup.classList.add('active');
-    tabLogin.classList.remove('active');
-    submitBtn.textContent = '註冊並登入';
-    errorMsgDiv.classList.add('hidden');
-  };
-
-  // 錯誤處理訊息中文化
-  function getFriendlyErrorMessage(code) {
-    switch (code) {
-      case 'auth/invalid-email':
-        return '❌ 無效的電子郵件格式。';
-      case 'auth/user-disabled':
-        return '❌ 該帳號已被停用。';
-      case 'auth/user-not-found':
-      case 'auth/wrong-password':
-      case 'auth/invalid-credential':
-        return '❌ 電子郵件或密碼錯誤。';
-      case 'auth/email-already-in-use':
-        return '❌ 該電子郵件已被註冊使用。';
-      case 'auth/weak-password':
-        return '❌ 密碼強度不足，請輸入至少 6 位數。';
-      case 'auth/popup-closed-by-user':
-        return '❌ Google 登入視窗已被關閉。';
-      default:
-        return `❌ 發生錯誤 (代碼: ${code})，請稍後再試。`;
-    }
-  }
-
-  // 遞交表單
-  authForm.onsubmit = async (e) => {
-    e.preventDefault();
-    errorMsgDiv.classList.add('hidden');
-    showLoading(true);
-
-    const email = emailInput.value;
-    const password = passwordInput.value;
-
-    try {
-      if (mode === 'signup') {
-        // 原生註冊
-        await createUserWithEmailAndPassword(auth, email, password);
-      } else {
-        // 原生登入
-        await signInWithEmailAndPassword(auth, email, password);
-      }
-    } catch (err) {
-      console.error('Email 認證錯誤:', err);
-      errorMsgDiv.textContent = getFriendlyErrorMessage(err.code);
-      errorMsgDiv.classList.remove('hidden');
-    } finally {
-      showLoading(false);
-    }
-  };
-
-  // Google 一鍵登入
-  googleBtn.onclick = async () => {
-    errorMsgDiv.classList.add('hidden');
-    showLoading(true);
-    const provider = new GoogleAuthProvider();
-    try {
-      await signInWithPopup(auth, provider);
-    } catch (err) {
-      console.error('Google 登入錯誤:', err);
-      errorMsgDiv.textContent = getFriendlyErrorMessage(err.code);
-      errorMsgDiv.classList.remove('hidden');
-    } finally {
-      showLoading(false);
-    }
-  };
-}
-
-// 載入創作者的賀卡 Dashboard
-async function loadCreatorDashboard(creatorId) {
+// 載入創作者的賀卡 Dashboard (Supabase)
+async function loadCreatorDashboard(supabase, creatorId) {
   const container = document.getElementById('dashboard-cards-container');
   container.innerHTML = '<div class="spinner" style="margin: 20px auto; grid-column: 1/-1;"></div>';
   
-  if (offlineMode) {
+  if (offlineMode || !supabase) {
     container.innerHTML = `
       <div class="no-cards-fallback">
         <p>⚠️ 目前處於「離線壓縮模式」，後台不支援雲端賀卡列表。您可以在下方直接製作賀卡，系統將直接以網址儲存！</p>
@@ -246,12 +158,18 @@ async function loadCreatorDashboard(creatorId) {
   }
 
   try {
-    const q = query(collection(db, 'cards'), where('creatorId', '==', creatorId));
-    const querySnapshot = await getDocs(q);
+    // 查詢該 creator_id 建立的卡片
+    const { data: cards, error } = await supabase
+      .from('cards')
+      .select('*')
+      .eq('creator_id', creatorId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
     
     container.innerHTML = '';
     
-    if (querySnapshot.empty) {
+    if (!cards || cards.length === 0) {
       container.innerHTML = `
         <div class="no-cards-fallback">
           <p>您尚未製作任何雲端生日賀卡。點擊下方「製作新賀卡」開始吧！</p>
@@ -260,9 +178,8 @@ async function loadCreatorDashboard(creatorId) {
       return;
     }
 
-    querySnapshot.forEach((doc) => {
-      const card = doc.data();
-      const cardId = doc.id;
+    cards.forEach((card) => {
+      const cardId = card.id;
       const cardUrl = `${window.location.origin}${window.location.pathname}?id=${cardId}`;
       
       const cardElement = document.createElement('div');
@@ -272,8 +189,8 @@ async function loadCreatorDashboard(creatorId) {
       let expiryLabel = '永久保存';
       let expiryClass = 'expiry-active';
       
-      if (card.expiresAt) {
-        const expiresMs = card.expiresAt.toDate().getTime();
+      if (card.expires_at) {
+        const expiresMs = new Date(card.expires_at).getTime();
         const diffMs = expiresMs - new Date().getTime();
         
         if (diffMs <= 0) {
@@ -286,7 +203,7 @@ async function loadCreatorDashboard(creatorId) {
         }
       }
 
-      // 主題繁體中文字
+      // 主題中文化
       const themeNames = {
         'theme-pastel-rose': '溫馨粉金',
         'theme-midnight-aurora': '星空極光',
@@ -319,7 +236,7 @@ async function loadCreatorDashboard(creatorId) {
 
     lucide.createIcons();
 
-    // 綁定複製按鈕
+    // 複製按鈕綁定
     container.querySelectorAll('.db-btn-copy').forEach(btn => {
       btn.onclick = () => {
         const url = btn.getAttribute('data-url');
@@ -335,24 +252,31 @@ async function loadCreatorDashboard(creatorId) {
       };
     });
 
-    // 綁定刪除按鈕
+    // 刪除按鈕綁定
     container.querySelectorAll('.db-btn-delete').forEach(btn => {
       btn.onclick = async () => {
         const id = btn.getAttribute('data-id');
         if (confirm('確定要永久刪除此生日賀卡嗎？刪除後連結將立即失效，且無法復原。')) {
           try {
-            await deleteDoc(doc(db, 'cards', id));
+            const { error: deleteError } = await supabase
+              .from('cards')
+              .delete()
+              .eq('id', id);
+
+            if (deleteError) throw deleteError;
+
             playPopSound();
             confetti({
               particleCount: 50,
               spread: 60,
               origin: { y: 0.8 }
             });
+            
             // 重新載入列表
-            loadCreatorDashboard(creatorId);
-          } catch (deleteError) {
-            console.error('刪除卡片失敗:', deleteError);
-            alert('刪除失敗，這張卡片可能已過期或您無權限刪除。');
+            loadCreatorDashboard(supabase, creatorId);
+          } catch (deleteErr) {
+            console.error('刪除卡片失敗:', deleteErr);
+            alert('刪除失敗，可能此卡片已過期或您無權限刪除。');
           }
         }
       };
@@ -362,7 +286,7 @@ async function loadCreatorDashboard(creatorId) {
     console.error('讀取創作者賀卡列表錯誤:', error);
     container.innerHTML = `
       <div class="no-cards-fallback">
-        <p>❌ 讀取賀卡清單失敗。請確認 Firebase Firestore 安全性規則已設定。</p>
+        <p>❌ 讀取賀卡清單失敗。請確認 Supabase RLS 安全性策略與 SQL 設定。</p>
       </div>
     `;
   }
@@ -468,7 +392,7 @@ function playCheerSound() {
 // ==========================================================================
 // 賀卡編輯器邏輯 (Creator Mode Logic)
 // ==========================================================================
-function setupCreator(creatorId = null) {
+function setupCreator(supabase = null, creatorId = null) {
   const form = document.getElementById('card-form');
   const recipientInput = document.getElementById('recipient-input');
   const senderInput = document.getElementById('sender-input');
@@ -568,35 +492,60 @@ function setupCreator(creatorId = null) {
         scratch: scratchToggle.checked,
         balloons: document.getElementById('game-balloons-toggle').checked
       },
-      scratchPrize: scratchToggle.checked ? scratchPrizeInput.value || '神秘大獎一份！' : '',
+      scratch_prize: scratchToggle.checked ? scratchPrizeInput.value || '神秘大獎一份！' : '',
       music: musicInput.value,
-      customMusicUrl: musicInput.value === 'music-custom' ? customMusicUrl.value : '',
-      createdAt: new Date().getTime(),
-      expiresAt: expiresAtDate ? expiresAtDate.getTime() : null,
-      creatorId: creatorId // 綁定創作者 ID (Firebase Auth 提供)
+      custom_music_url: musicInput.value === 'music-custom' ? customMusicUrl.value : '',
+      expires_at: expiresAtDate ? expiresAtDate.toISOString() : null,
+      creator_id: creatorId // 綁定創作者 ID (Clerk 提供)
     };
 
     let shareUrl = '';
 
-    if (!offlineMode && creatorId) {
-      // Firebase 雲端儲存
+    if (!offlineMode && supabase && creatorId) {
+      // Supabase 雲端儲存
       try {
-        const docRef = await addDoc(collection(db, 'cards'), {
-          ...cardPayload,
-          createdAt: Timestamp.now(),
-          expiresAt: expiresAtDate ? Timestamp.fromDate(expiresAtDate) : null
-        });
-        shareUrl = `${window.location.origin}${window.location.pathname}?id=${docRef.id}`;
+        const { data, error } = await supabase
+          .from('cards')
+          .insert([cardPayload])
+          .select();
+
+        if (error) throw error;
+
+        const newDocId = data[0].id;
+        shareUrl = `${window.location.origin}${window.location.pathname}?id=${newDocId}`;
         
-        // 成功後刷新後台列表
-        loadCreatorDashboard(creatorId);
+        // 成功後重新讀取後台列表
+        loadCreatorDashboard(supabase, creatorId);
       } catch (err) {
-        console.error('寫入 Firebase 失敗，切換為 URL 壓縮模式:', err);
-        shareUrl = generateOfflineLink(cardPayload);
+        console.error('寫入 Supabase 失敗，切換為 URL 壓縮模式:', err);
+        // 對應轉換為駝峰命名給 offline 使用
+        const offlinePayload = {
+          ...cardPayload,
+          scratchPrize: cardPayload.scratch_prize,
+          customMusicUrl: cardPayload.custom_music_url,
+          expiresAt: expiresAtDate ? expiresAtDate.getTime() : null
+        };
+        shareUrl = generateOfflineLink(offlinePayload);
       }
     } else {
       // 離線 URL 壓縮儲存
-      shareUrl = generateOfflineLink(cardPayload);
+      const offlinePayload = {
+        recipient: recipientInput.value,
+        sender: senderInput.value,
+        message: messageInput.value,
+        theme: theme,
+        games: {
+          candle: document.getElementById('game-candle-toggle').checked,
+          scratch: scratchToggle.checked,
+          balloons: document.getElementById('game-balloons-toggle').checked
+        },
+        scratchPrize: scratchToggle.checked ? scratchPrizeInput.value || '神秘大獎一份！' : '',
+        music: musicInput.value,
+        customMusicUrl: musicInput.value === 'music-custom' ? customMusicUrl.value : '',
+        createdAt: new Date().getTime(),
+        expiresAt: expiresAtDate ? expiresAtDate.getTime() : null
+      };
+      shareUrl = generateOfflineLink(offlinePayload);
     }
 
     showLoading(false);
@@ -735,15 +684,32 @@ async function loadCardViewer(docId, compressedData) {
       return;
     }
     try {
-      const docSnap = await getDoc(doc(db, 'cards', docId));
-      if (docSnap.exists()) {
-        cardData = docSnap.data();
-        if (cardData.expiresAt) {
-          cardData.expiresAtMs = cardData.expiresAt.toDate().getTime();
-        }
+      // 匿名連接 Supabase 讀取公開卡片資訊
+      const publicSupabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+      const { data, error } = await publicSupabase
+        .from('cards')
+        .select('*')
+        .eq('id', docId)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        // 對應轉換為駝峰命名給 Viewer 使用
+        cardData = {
+          recipient: data.recipient,
+          sender: data.sender,
+          message: data.message,
+          theme: data.theme,
+          games: data.games,
+          scratchPrize: data.scratch_prize,
+          music: data.music,
+          customMusicUrl: data.custom_music_url,
+          expiresAtMs: data.expires_at ? new Date(data.expires_at).getTime() : null
+        };
       }
     } catch (err) {
-      console.error('從 Firebase 讀取賀卡失敗:', err);
+      console.error('從 Supabase 讀取賀卡失敗:', err);
     }
   } else if (compressedData) {
     try {
@@ -766,6 +732,7 @@ async function loadCardViewer(docId, compressedData) {
     return;
   }
 
+  // 檢查是否已過期
   if (cardData.expiresAtMs && new Date().getTime() > cardData.expiresAtMs) {
     showExpiredScreen();
     return;
@@ -956,9 +923,8 @@ function setupStepNavigation() {
     stopBalloonSpawner();
     stopMicDetection();
 
-    // 移除 URL 參數，返回主畫面 (Firebase 登入首頁/Dashboard)
+    // 移除 URL 參數，返回主畫面
     window.history.pushState({}, document.title, window.location.pathname);
-    
     document.getElementById('viewer-view').classList.add('hidden');
     window.location.reload();
   };
@@ -1342,9 +1308,8 @@ function showExpiredScreen(customMsg) {
 // 路由分發與入口 (Routing & Initialization Entry)
 // ==========================================================================
 window.addEventListener('DOMContentLoaded', () => {
-  // 1. 初始化 Firebase Firestore 與 Auth
-  initFirebase();
-  lucide.createIcons();
+  // 1. 初始化 Supabase 設定判定
+  initSupabaseCheck();
 
   // 2. 解析 URL 參數
   const urlParams = new URLSearchParams(window.location.search);
@@ -1352,11 +1317,11 @@ window.addEventListener('DOMContentLoaded', () => {
   const compressedData = urlParams.get('card');
 
   if (cardId || compressedData) {
-    // A. 「收件人模式」：完全略過登入，直接開啟賀卡
+    // A. 「收件人模式」：直接讀取卡片內容，略過登入
     loadCardViewer(cardId, compressedData);
   } else {
-    // B. 「創作者模式」：需要登入
+    // B. 「創作者模式」：使用 Clerk 登入
     showLoading(false);
-    initFirebaseAuth();
+    initClerkAuth();
   }
 });

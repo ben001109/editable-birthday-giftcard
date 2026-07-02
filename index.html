@@ -14,6 +14,8 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
   <!-- LZ-String URL Compression CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+  <!-- Supabase SDK CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Core Stylesheet -->
   <link rel="stylesheet" href="style.css">
 </head>
@@ -51,38 +53,10 @@
           <div class="feature-item"><span class="feature-icon">🎂</span> <span>吹熄蛋糕蠟燭遊戲（支援麥克風與點擊）</span></div>
           <div class="feature-item"><span class="feature-icon">🎁</span> <span>自訂驚喜刮刮樂兌換券</span></div>
           <div class="feature-item"><span class="feature-icon">🎈</span> <span>歡樂飄浮氣球與戳破互動</span></div>
-          <div class="feature-item"><span class="feature-icon">⏳</span> <span>整合 Firebase 設定 3/5/7 天後自動銷毀</span></div>
+          <div class="feature-item"><span class="feature-icon">⏳</span> <span>整合 Supabase 設定 3/5/7 天後自動銷毀</span></div>
         </div>
 
-        <!-- Firebase Auth 原生登入註冊卡片 -->
-        <div class="auth-card">
-          <div class="auth-tabs">
-            <button id="tab-login" class="auth-tab active">帳號登入</button>
-            <button id="tab-signup" class="auth-tab">免費註冊</button>
-          </div>
-          
-          <form id="email-auth-form" class="email-auth-form">
-            <div class="form-group">
-              <label for="auth-email">電子郵件 (Email)</label>
-              <input type="email" id="auth-email" required placeholder="example@email.com">
-            </div>
-            <div class="form-group">
-              <label for="auth-password">密碼 (Password)</label>
-              <input type="password" id="auth-password" required placeholder="請輸入 6 位數以上密碼">
-            </div>
-            <div id="auth-error-msg" class="auth-error-msg hidden"></div>
-            <button type="submit" id="auth-submit-btn" class="btn btn-submit-card">登入帳號</button>
-          </form>
-
-          <div class="auth-divider">
-            <span>或</span>
-          </div>
-
-          <button id="google-auth-btn" class="btn btn-secondary google-btn">
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" alt="Google Logo" class="google-logo-img">
-            使用 Google 帳號一鍵登入
-          </button>
-        </div>
+        <div id="clerk-sign-in-mount"></div>
       </div>
     </div>
 
@@ -93,8 +67,7 @@
       <nav class="navbar card-glass">
         <div class="logo">🎉 <span>B-Day Giftcard</span></div>
         <div class="nav-actions">
-          <span id="user-display-email" class="user-display-email"></span>
-          <button id="auth-signout-btn" class="btn btn-secondary btn-sm"><i data-lucide="log-out"></i> 登出</button>
+          <div id="clerk-user-button-mount"></div>
         </div>
       </nav>
 

@@ -1535,108 +1535,11 @@ p {
   font-size: 1.2rem;
 }
 
-/* Firebase Auth 原生登入卡片 */
-.auth-card {
+#clerk-sign-in-mount {
   width: 100%;
-  background: rgba(255, 255, 255, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: var(--border-radius-lg);
-  padding: 25px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-}
-
-.auth-tabs {
   display: flex;
-  width: 100%;
-  border-bottom: 1px solid rgba(0,0,0,0.08);
-  margin-bottom: 20px;
-}
-
-.auth-tab {
-  flex: 1;
-  background: transparent;
-  border: none;
-  padding: 12px;
-  font-family: var(--font-heading);
-  font-weight: 700;
-  font-size: 1rem;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: var(--transition-smooth);
-}
-
-.auth-tab:hover {
-  color: var(--text-main);
-}
-
-.auth-tab.active {
-  color: var(--primary-color);
-  border-bottom: 3px solid var(--primary-color);
-}
-
-.email-auth-form {
-  width: 100%;
-  text-align: left;
-}
-
-.auth-error-msg {
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  color: #dc2626;
-  font-size: 0.85rem;
-  padding: 10px 14px;
-  border-radius: var(--border-radius-md);
-  margin-bottom: 15px;
-  animation: fadeIn 0.3s ease;
-}
-
-.auth-divider {
-  display: flex;
-  align-items: center;
   justify-content: center;
-  gap: 12px;
-  margin: 20px 0;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-
-.auth-divider::before,
-.auth-divider::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: rgba(0, 0, 0, 0.08);
-}
-
-.google-btn {
-  width: 100%;
-  background: white !important;
-  color: var(--text-main) !important;
-  border: 1px solid rgba(0, 0, 0, 0.12) !important;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.02) !important;
-}
-
-.google-btn:hover {
-  background: #f8fafc !important;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
-}
-
-.google-logo-img {
-  width: 18px;
-  height: 18px;
-}
-
-.user-display-email {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 0.85rem;
-  border-radius: 8px;
+  min-height: 200px;
 }
 
 /* Dashboard 後台 */

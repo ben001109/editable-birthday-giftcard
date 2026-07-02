@@ -1,50 +1,59 @@
-// Firebase 設定檔案
+// Supabase 與 Clerk 設定檔案
 // ==========================================
 
-// 1. Firebase Web 應用程式配置
-export const firebaseConfig = {
-  apiKey: "AIzaSyDpMp2g4zX10aitRMwZ9DP8ROGGzCmC4xE",
-  authDomain: "birthdaycard-8d6a9.firebaseapp.com",
-  projectId: "birthdaycard-8d6a9",
-  storageBucket: "birthdaycard-8d6a9.firebasestorage.app",
-  messagingSenderId: "957762771812",
-  appId: "1:957762771812:web:dbc305e32314f589687871"
-};
+// 1. Supabase 設定
+// 已成功設定您的 Supabase 專案 (ref: aiqvsvgobxhldtmqshfm)
+export const supabaseUrl = "https://aiqvsvgobxhldtmqshfm.supabase.co";
+export const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFpcXZzdmdvYnhsZHRtcXNwaGZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwMDg4OTUsImV4cCI6MjA5ODU4NDg5NX0.OHDA4UOMzrzCdMYfwGu7VPrpSwLyPTCRdeQK3NyHAAA";
+
+// 2. Clerk 身份驗證設定
+// 已設定您的 Clerk 專案 Publishable Key
+export const clerkPublishableKey = "pk_test_cHJlcGFyZWQtaGFsaWJ1dC0yLmNsZXJrLmFjY291bnRzLmRldiQ";
 
 // ==========================================
 // 💡 指引：
 // 
-// [Firebase 登入機制設定]
-// 1. 請前往 Firebase 控制台 (https://console.firebase.google.com/)。
-// 2. 點擊進入您的專案：birthdaycard-8d6a9。
-// 3. 在左側選單點擊 Build > Authentication，然後點擊「開始使用」。
-// 4. 啟用以下兩種登入方式：
-//    - 「電子郵件/密碼」：開啟並儲存。
-//    - 「Google」：開啟，填寫專案的支援電子郵件，然後儲存。
+// [Supabase 資料表設定 (SQL)]
+// 請在 Supabase 控制台的 SQL Editor 中執行以下腳本來建立資料表：
 // 
-// [Firebase Firestore 安全規則]
-// 請在 Firebase Firestore > 規則 (Rules) 貼上以下安全性配置，然後點擊「發佈」：
+// create table public.cards (
+//   id uuid default gen_random_uuid() primary key,
+//   recipient text not null,
+//   sender text not null,
+//   message text not null,
+//   theme text not null,
+//   games jsonb not null,
+//   scratch_prize text,
+//   music text,
+//   custom_music_url text,
+//   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+//   expires_at timestamp with time zone,
+//   creator_id text not null
+// );
 // 
-// rules_version = '2';
-// service cloud.firestore {
-//   match /databases/{database}/documents {
-//     match /cards/{cardId} {
-//       // 任何人都可以讀取卡片（用於壽星拆信）
-//       // 只有當前時間小於過期時間時，才允許讀取
-//       allow read: if resource == null || resource.data.expiresAt == null || resource.data.expiresAt > request.time;
-//       
-//       // 只有登入用戶（Firebase Auth）才能建立卡片
-//       allow create: if request.auth != null;
-//       
-//       // 只有卡片擁有者才能刪除卡片
-//       allow delete: if request.auth != null && resource.data.creatorId == request.auth.uid;
-//       
-//       // 本系統卡片不開放修改
-//       allow update: if false;
-//     }
-//   }
-// }
+// [啟用 Row Level Security (RLS) 安全策略]
+// 執行以下 SQL 以啟用 RLS 並設定對應的存取政策：
+// 
+// alter table public.cards enable row level security;
+// 
+// -- 政策 1: 任何人皆可讀取未過期的賀卡 (供壽星拆信)
+// create policy "Anyone can read unexpired cards"
+// on public.cards for select
+// using (expires_at is null or expires_at > now());
+// 
+// -- 政策 2: 只有經 Clerk 驗證的用戶可以建立卡片
+// create policy "Authenticated users can insert cards"
+// on public.cards for insert
+// with check (auth.jwt() ->> 'sub' = creator_id);
+// 
+// -- 政策 3: 只有卡片擁有者可以刪除卡片
+// create policy "Users can delete their own cards"
+// on public.cards for delete
+// using (auth.jwt() ->> 'sub' = creator_id);
 //
-// [TTL 自動過期銷毀（選用）]
-// 1. 前往 Google Cloud 的 Firestore TTL 頁面：https://console.cloud.google.com/firestore/ttl
-// 2. 為 `cards` 集合的 `expiresAt` 欄位建立 TTL 規則，即可在時間過期時由雲端自動徹底刪除資料。
+// [Clerk Dashboard 設定]
+// 1. 前往 Clerk Dashboard > JWT Templates。
+// 2. 點擊 New Template > 選擇 Supabase。
+// 3. 在 Supabase 控制台 > Project Settings > API 複製 JWT Secret。
+// 4. 回到 Clerk 的 Supabase 模板編輯頁，將 JWT Secret 貼入 "Signing key" 欄位中，然後儲存。
+// 5. 這將允許 Clerk 自動簽發 Supabase 能驗證的安全性 JWT Token。
