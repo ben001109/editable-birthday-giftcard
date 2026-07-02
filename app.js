@@ -74,9 +74,25 @@ function initClerkAuth() {
     return;
   }
 
-  // 動態載入 Clerk SDK 腳本以防止 Missing publishableKey 報錯
+  // 從 Publishable Key 中解析出您的 Clerk Frontend API Domain
+  let frontendApi = '';
+  try {
+    const base64Part = clerkPublishableKey.split('_')[2];
+    if (base64Part) {
+      frontendApi = atob(base64Part).replace('$', '');
+    }
+  } catch (e) {
+    console.error('解析 Clerk Publishable Key 失敗:', e);
+  }
+
+  if (!frontendApi) {
+    console.error('❌ 無法解析 Clerk Frontend API Domain，請檢查金鑰格式。');
+    return;
+  }
+
+  // 動態建立帶有 UI 元件的正確 Clerk SDK 腳本 (由您專屬的 Frontend API 域名服務)
   const script = document.createElement('script');
-  script.src = "https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";
+  script.src = `https://${frontendApi}/npm/@clerk/clerk-js@latest/dist/clerk.browser.js`;
   script.async = true;
   script.crossOrigin = "anonymous";
   script.setAttribute('data-clerk-publishable-key', clerkPublishableKey);
@@ -141,6 +157,18 @@ function initClerkAuth() {
   };
 
   document.body.appendChild(script);
+}
+
+// HTML 安全轉義防護 XSS
+function escapeHtml(string) {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return String(string).replace(/[&<>'"]/g, (m) => map[m]);
 }
 
 // 載入創作者的賀卡 Dashboard (Supabase)
@@ -218,11 +246,11 @@ async function loadCreatorDashboard(supabase, creatorId) {
 
       cardElement.innerHTML = `
         <div class="db-card-header">
-          <span class="db-card-to">To: ${card.recipient}</span>
+          <span class="db-card-to">To: ${escapeHtml(card.recipient)}</span>
           <span class="db-card-theme-badge">${themeLabel}</span>
         </div>
         <div class="db-card-body">
-          <p class="db-card-snippet">${msgSnippet}</p>
+          <p class="db-card-snippet">${escapeHtml(msgSnippet)}</p>
           <span class="db-card-expiry ${expiryClass}">${expiryLabel}</span>
         </div>
         <div class="db-card-actions">

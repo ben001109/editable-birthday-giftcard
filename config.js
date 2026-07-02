@@ -2,8 +2,8 @@
 // ==========================================
 
 // 1. Supabase 設定
-// 已成功設定您的 Supabase 專案 (ref: aiqvsvgobxhldtmqshfm)
-export const supabaseUrl = "https://aiqvsvgobxhldtmqshfm.supabase.co";
+// 已成功設定您的 Supabase 專案 (ref: aiqvsvgobxldtmqsphfm)
+export const supabaseUrl = "https://aiqvsvgobxldtmqsphfm.supabase.co";
 export const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFpcXZzdmdvYnhsZHRtcXNwaGZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwMDg4OTUsImV4cCI6MjA5ODU4NDg5NX0.OHDA4UOMzrzCdMYfwGu7VPrpSwLyPTCRdeQK3NyHAAA";
 
 // 2. Clerk 身份驗證設定
