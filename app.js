@@ -114,8 +114,10 @@ function initClerkAuth() {
           let supabaseClient = null;
           if (!offlineMode) {
             try {
-              // 取得 Clerk 為 Supabase 簽發的安全 JWT Token
-              const token = await window.Clerk.session.getToken({ template: 'supabase' });
+              // 使用 Supabase 原生 Clerk 第三方驗證 (Native Third-Party Auth)
+              // 不需要 JWT Template，直接用 Clerk 的原生 session token
+              // Supabase 會透過 Clerk JWKS 端點自動驗證 ES256 簽名
+              const token = await window.Clerk.session.getToken();
               
               if (token) {
                 // 初始化帶有 Clerk JWT 認證的 Supabase 安全客戶端
@@ -127,11 +129,11 @@ function initClerkAuth() {
                   }
                 });
               } else {
-                console.warn('⚠️ 未取得 Clerk 的 Supabase token，將以匿名模式存取 Supabase（可能因未在 Clerk 後台建立 Supabase 模板）。');
+                console.warn('⚠️ 未取得 Clerk token，將以匿名模式存取 Supabase。');
                 supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
               }
             } catch (jwtError) {
-              console.error('取得 Clerk Supabase Token 失敗:', jwtError);
+              console.error('取得 Clerk Token 失敗:', jwtError);
               supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
             }
           }
