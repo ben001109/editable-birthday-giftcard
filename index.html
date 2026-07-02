@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>專屬動態生日賀卡系統</title>
+  <meta name="version" content="v1.3.0">
 
   <!-- Open Graph / 社群媒體預覽 (LINE, Facebook, Discord, WhatsApp 等) -->
   <meta property="og:type" content="website">
@@ -173,6 +174,11 @@
                   <input type="radio" name="theme" value="theme-minimalist-paper">
                   <span class="theme-preview minimalist-paper-preview"></span>
                   <span class="theme-name">日系紙藝</span>
+                </label>
+                <label class="theme-option" data-theme="theme-mono-ink">
+                  <input type="radio" name="theme" value="theme-mono-ink">
+                  <span class="theme-preview mono-ink-preview"></span>
+                  <span class="theme-name">黑白素墨</span>
                 </label>
               </div>
             </div>
@@ -417,5 +423,20 @@
   <!-- Core Scripts -->
   <!-- 引入 Firebase SDK (載入 App 與 Firestore，使用 ES Module 機制在 app.js 中導入) -->
   <script type="module" src="app.js"></script>
+  <!-- 版本標籤 (右下角) -->
+  <div id="version-badge" style="
+    position: fixed;
+    bottom: 12px;
+    right: 14px;
+    font-size: 0.68rem;
+    color: rgba(120,120,140,0.7);
+    font-family: monospace;
+    letter-spacing: 0.04em;
+    z-index: 9999;
+    pointer-events: none;
+    user-select: none;
+  ">v1.3.0</div>
+
 </body>
+
 </html>

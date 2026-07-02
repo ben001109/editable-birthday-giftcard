@@ -70,6 +70,44 @@ function initClerkAuth() {
     document.getElementById('creator-view').classList.remove('hidden');
     document.getElementById('creator-dashboard').classList.add('hidden');
     document.querySelector('.nav-actions').style.display = 'none';
+    
+    // 1. Add form reset logic to show-editor-btn click handler
+    document.getElementById('show-editor-btn').addEventListener('click', () => {
+      document.getElementById('card-form').reset();
+      document.getElementById('creator-dashboard').classList.add('hidden');
+      document.getElementById('editor-section').classList.remove('hidden');
+    });
+
+    // 2. Expand mobile CSS media queries (Injected via style block)
+    const mobileStyles = document.createElement('style');
+    mobileStyles.textContent = `
+@media (max-width: 768px) {
+  .creator-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .dashboard-grid { grid-template-columns: 1fr; }
+  .card-preview-window { min-height: 200px; }
+  .theme-grid { grid-template-columns: repeat(2, 1fr); }
+  .editor-sidebar { padding: 16px; }
+  .opening-stage { padding: 20px 16px; }
+  .envelope-container-3d { width: 300px; height: 200px; }
+  .card-viewer-step { padding: 24px 16px; }
+  .card-title-to { font-size: 1.5rem; }
+  .card-message { font-size: 1rem; }
+  .step-next-btn { width: 100%; }
+  .final-actions { flex-direction: column; gap: 10px; }
+  .final-actions .btn { width: 100%; justify-content: center; }
+}
+@media (max-width: 480px) {
+  .final-actions { flex-direction: column; }
+  .creator-view, .auth-view { padding: 12px; }
+  .card-stage { padding: 0 8px; }
+  .envelope-container-3d { width: 260px; height: 170px; }
+  .to-label-3d { font-size: 1rem; min-width: 120px; }
+  .envelope-seal-3d { width: 50px; height: 50px; font-size: 1.4rem; }
+  .viewer-page-title { font-size: 1.2rem; }
+  #clerk-sign-in-mount { width: 100%; max-width: 100%; }
+}`;
+    document.head.appendChild(mobileStyles);
+    
     setupCreator();
     return;
   }
@@ -435,10 +473,28 @@ function setupCreator(supabase = null, creatorId = null) {
   const previewTo = document.getElementById('preview-to');
   const previewWindow = document.getElementById('card-preview-window');
 
-  // 後台「製作新賀卡」滾動按鈕
+  // 後台「製作新賀卡」滾動按鈕 — 同時清空表單讓使用者重新填寫
   const showEditorBtn = document.getElementById('show-editor-btn');
   if (showEditorBtn) {
     showEditorBtn.onclick = () => {
+      // 清空所有輸入欄位
+      form.reset();
+      // 重設預覽文字
+      previewTo.textContent = '壽星名字';
+      // 重設主題選取器 UI 狀態
+      document.querySelectorAll('.theme-option').forEach(opt => opt.classList.remove('active'));
+      const firstTheme = document.querySelector('.theme-option');
+      if (firstTheme) firstTheme.classList.add('active');
+      // 重設預覽窗 class
+      previewWindow.className = 'card-preview-window';
+      const defaultTheme = document.querySelector('input[name="theme"]:checked');
+      if (defaultTheme) previewWindow.classList.add(defaultTheme.value);
+      // 隱藏條件式欄位
+      scratchGroup.classList.add('hidden');
+      customMusicGroup.classList.add('hidden');
+      // 清除草稿
+      localStorage.removeItem('cardDraft');
+      // 滾動到編輯器
       document.getElementById('editor-form-container').scrollIntoView({ behavior: 'smooth' });
     };
   }

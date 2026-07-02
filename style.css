@@ -117,6 +117,30 @@
   --theme-bg-pattern-size: 24px 24px;
 }
 
+/* 黑白素墨主題 (Monochrome Ink) */
+.theme-mono-ink {
+  --theme-bg: #ffffff;
+  --theme-card-bg: #f9f9f9;
+  --theme-card-border: #d0d0d0;
+  --theme-text-color: #111111;
+  --theme-text-muted: #555555;
+  --theme-primary: #222222;
+  --theme-secondary: #555555;
+  --theme-accent: #111111;
+  --theme-accent-glow: rgba(0, 0, 0, 0.12);
+  --theme-font: 'Noto Sans TC', serif;
+  --theme-title-font: 'Dancing Script', cursive;
+  --theme-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+  --theme-bg-pattern: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 27px,
+    rgba(0,0,0,0.06) 27px,
+    rgba(0,0,0,0.06) 28px
+  );
+  --theme-bg-pattern-size: auto;
+}
+
 
 /* ==========================================================================
    CSS 重設與基礎樣式 (CSS Resets and Base Styles)
@@ -469,6 +493,7 @@ p {
 .pixel-retro-preview { background: #ffe066; border: 2px solid #000; }
 .cyber-party-preview { background: linear-gradient(135deg, #0d0e15 0%, #ff007f 100%); }
 .minimalist-paper-preview { background: #f5f2eb; border: 1px solid #d9d9d9; }
+.mono-ink-preview { background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%); border: 2px solid #111; }
 
 /* 複選框 */
 .checkbox-group {
