@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>專屬動態生日賀卡系統</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Dancing+Script:wght@700&family=Inter:wght@300;400;600;700&family=Outfit:wght@400;600;800&family=Noto+Sans+TC:wght@300;400;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- LZ-String URL Compression CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+  <!-- Clerk SDK CDN -->
+  <script async crossorigin="anonymous" src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js" type="text/javascript"></script>
+  <!-- Core Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Loading 畫面 -->
+  <div id="loading-screen" class="loading-overlay">
+    <div class="spinner"></div>
+    <p>讀取中，請稍候...</p>
+  </div>
+
+  <!-- 賀卡過期畫面 -->
+  <div id="expired-screen" class="expired-overlay hidden">
+    <div class="expired-card">
+      <div class="expired-icon">⏳</div>
+      <h2>這張賀卡已過期失效</h2>
+      <p>抱歉，此賀卡設定的有效期已過。您可以建立一張屬於自己的生日賀卡！</p>
+      <button id="expired-create-btn" class="btn btn-primary">製作我自己的賀卡</button>
+    </div>
+  </div>
+
+  <!-- 主容器 -->
+  <main id="main-container">
+
+    <!-- ==============================================
+         0. 身份驗證畫面 (Auth View / Landing Page)
+         ============================================== -->
+    <div id="auth-view" class="view-section hidden">
+      <div class="auth-landing card-glass">
+        <div class="logo">🎉 <span>B-Day Giftcard</span></div>
+        <h2>專屬動態生日賀卡系統</h2>
+        <p class="auth-desc">歡迎使用動態生日賀卡系統！登入後您可以自由設計精美的生日賀卡、設定小遊戲互動、挑選背景音樂，並在個人的管理後台隨時查看與刪除您所發送的卡片。</p>
+        
+        <div class="auth-features">
+          <div class="feature-item"><span class="feature-icon">🎂</span> <span>吹熄蛋糕蠟燭遊戲（支援麥克風與點擊）</span></div>
+          <div class="feature-item"><span class="feature-icon">🎁</span> <span>自訂驚喜刮刮樂兌換券</span></div>
+          <div class="feature-item"><span class="feature-icon">🎈</span> <span>歡樂飄浮氣球與戳破互動</span></div>
+          <div class="feature-item"><span class="feature-icon">⏳</span> <span>整合 Firebase 設定 3/5/7 天後自動銷毀</span></div>
+        </div>
+
+        <div id="clerk-sign-in-mount"></div>
+      </div>
+    </div>
+
+    <!-- ==============================================
+         1. 賀卡編輯器與管理後台 (Creator View)
+         ============================================== -->
+    <div id="creator-view" class="view-section hidden">
+      <nav class="navbar card-glass">
+        <div class="logo">🎉 <span>B-Day Giftcard</span></div>
+        <div class="nav-actions">
+          <div id="clerk-user-button-mount"></div>
+        </div>
+      </nav>
+
+      <!-- 創作者管理後台 Dashboard -->
+      <section id="creator-dashboard" class="creator-dashboard card-glass">
+        <div class="dashboard-header">
+          <h2><i data-lucide="layout-dashboard"></i> 我的賀卡後台</h2>
+          <button id="show-editor-btn" class="btn btn-primary"><i data-lucide="plus"></i> 製作新賀卡</button>
+        </div>
+        <div id="dashboard-cards-container" class="dashboard-cards-grid">
+          <div class="no-cards-fallback">
+            <p>您尚未製作任何生日賀卡。點擊上方「製作新賀卡」開始吧！</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="editor-container" id="editor-form-container">
+        <!-- 左側編輯表單 -->
+        <section class="editor-sidebar card-glass">
+          <h2 class="section-title"><i data-lucide="edit-3"></i> 自訂卡片內容</h2>
+          
+          <form id="card-form">
+            <!-- 區塊：基本資訊 -->
+            <div class="form-group-section">
+              <h3><span class="step-num">1</span> 基本資訊</h3>
+              <div class="form-group">
+                <label for="recipient-input">壽星名字 (To)</label>
+                <input type="text" id="recipient-input" required placeholder="例如：親愛的寶貝、小明" maxLength="20">
+              </div>
+              <div class="form-group">
+                <label for="sender-input">您的名字 (From)</label>
+                <input type="text" id="sender-input" required placeholder="例如：愛你的老公、心儀的同學" maxLength="20">
+              </div>
+              <div class="form-group">
+                <label for="expiry-input">卡片有效期限 (三天後自動刪除)</label>
+                <select id="expiry-input">
+                  <option value="3">3 天 (短效隱私)</option>
+                  <option value="5">5 天</option>
+                  <option value="7" selected>7 天 (一星期)</option>
+                  <option value="999">永久保存 (不設定過期)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 區塊：祝福內容 -->
+            <div class="form-group-section">
+              <h3><span class="step-num">2</span> 寫下祝福話語</h3>
+              <div class="form-group">
+                <label for="message-input">祝福內容 (可換行，建議 100-300 字)</label>
+                <textarea id="message-input" rows="5" required placeholder="祝你生日快樂！天天開心！願你的所有願望都能實現..."></textarea>
+              </div>
+              <div class="template-suggestions">
+                <span class="template-tag" data-msg="親愛的，祝你生日快樂！願你在新的一歲裡，所有的願望都能如期而至，每天都有好心情。無論未來如何，我都一直在你身邊陪著你。Happy Birthday！❤️">💕 溫馨浪漫</span>
+                <span class="template-tag" data-msg="恭喜你又老了一歲！祝你吃不胖、長不老、賺大錢！希望你天天開心，繼續做最搞笑的自己，我們永遠是最好的朋友，生日快樂！🎂">🤪 幽默逗趣</span>
+                <span class="template-tag" data-msg="祝你在這個特別的日子裡，幸福滿滿，喜樂平安。願你未來的一年裡事業順利，身體健康，朝著自己的夢想勇敢前進，生日快樂！🌟">✨ 勵志溫馨</span>
+              </div>
+            </div>
+
+            <!-- 區塊：主題設計 -->
+            <div class="form-group-section">
+              <h3><span class="step-num">3</span> 主題風格</h3>
+              <div class="theme-selector-grid">
+                <label class="theme-option active" data-theme="theme-pastel-rose">
+                  <input type="radio" name="theme" value="theme-pastel-rose" checked>
+                  <span class="theme-preview pastel-rose-preview"></span>
+                  <span class="theme-name">溫馨粉金</span>
+                </label>
+                <label class="theme-option" data-theme="theme-midnight-aurora">
+                  <input type="radio" name="theme" value="theme-midnight-aurora">
+                  <span class="theme-preview midnight-aurora-preview"></span>
+                  <span class="theme-name">星空極光</span>
+                </label>
+                <label class="theme-option" data-theme="theme-pixel-retro">
+                  <input type="radio" name="theme" value="theme-pixel-retro">
+                  <span class="theme-preview pixel-retro-preview"></span>
+                  <span class="theme-name">復古像素</span>
+                </label>
+                <label class="theme-option" data-theme="theme-cyber-party">
+                  <input type="radio" name="theme" value="theme-cyber-party">
+                  <span class="theme-preview cyber-party-preview"></span>
+                  <span class="theme-name">賽博派對</span>
+                </label>
+                <label class="theme-option" data-theme="theme-minimalist-paper">
+                  <input type="radio" name="theme" value="theme-minimalist-paper">
+                  <span class="theme-preview minimalist-paper-preview"></span>
+                  <span class="theme-name">日系紙藝</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- 區塊：互動遊戲 -->
+            <div class="form-group-section">
+              <h3><span class="step-num">4</span> 互動小遊戲</h3>
+              <div class="checkbox-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="game-candle-toggle" checked>
+                  <span class="custom-checkbox"></span>
+                  <span>🎂 許願吹蠟燭 (可點擊或吹氣熄滅)</span>
+                </label>
+              </div>
+              <div class="checkbox-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="game-scratch-toggle" checked>
+                  <span class="custom-checkbox"></span>
+                  <span>🎁 驚喜刮刮樂 (刮出特製兌換券)</span>
+                </label>
+              </div>
+              <div class="form-group scratch-prize-group">
+                <label for="scratch-prize-input">刮刮樂獎項內容</label>
+                <input type="text" id="scratch-prize-input" placeholder="例如：請吃高級大餐一次！" defaultValue="請吃高級大餐一次！" maxLength="30">
+              </div>
+              <div class="checkbox-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="game-balloons-toggle" checked>
+                  <span class="custom-checkbox"></span>
+                  <span>🎈 戳氣球遊戲 (點擊飄浮氣球可戳破)</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- 區塊：背景音樂 -->
+            <div class="form-group-section">
+              <h3><span class="step-num">5</span> 背景音樂</h3>
+              <div class="form-group">
+                <label for="music-input">音樂選擇</label>
+                <select id="music-input">
+                  <option value="music-piano-hbd">🎹 溫馨鋼琴生日歌</option>
+                  <option value="music-box-hbd">🎵 水晶音樂盒生日歌</option>
+                  <option value="music-party-hbd">🎸 歡樂吉他派對歌</option>
+                  <option value="music-custom">🔗 自訂 MP3 音源網址...</option>
+                </select>
+              </div>
+              <div class="form-group custom-music-group hidden">
+                <label for="custom-music-url">自訂 MP3 網址 (須以 https:// 開頭並支援跨網域)</label>
+                <input type="url" id="custom-music-url" placeholder="https://example.com/song.mp3">
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-submit-card"><i data-lucide="share-2"></i> 生成生日賀卡連結</button>
+          </form>
+        </section>
+
+        <!-- 右側即時預覽 -->
+        <section class="editor-preview">
+          <div class="preview-sticky-wrapper">
+            <h2 class="section-title"><i data-lucide="eye"></i> 卡片即時預覽 (卡片收合狀態)</h2>
+            <div class="preview-frame-container">
+              <div id="card-preview-window" class="card-preview-window theme-pastel-rose">
+                <!-- 預覽信封 -->
+                <div class="preview-envelope">
+                  <div class="envelope-flap"></div>
+                  <div class="envelope-body">
+                    <div class="envelope-seal">🎂</div>
+                    <div class="envelope-labels">
+                      <div class="to-label">To: <span id="preview-to"></span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="preview-tip">提示：上方為卡片發送時收件人看到的第一眼樣貌 (信封狀態)。點擊下方生成連結後即可查看完整動畫！</p>
+          </div>
+        </section>
+      </div>
+
+      <!-- 生成連結 Modal 彈出視窗 -->
+      <div id="share-modal" class="modal hidden">
+        <div class="modal-content card-glass">
+          <span class="close-modal-btn">&times;</span>
+          <h2>🎉 賀卡生成成功！</h2>
+          <p>專屬生日賀卡已寫入 Firebase 資料庫。請複製下方連結發送給壽星吧！</p>
+          
+          <div class="share-url-container">
+            <input type="text" id="share-url-output" readonly>
+            <button id="copy-url-btn" class="btn btn-secondary"><i data-lucide="copy"></i> 複製</button>
+          </div>
+
+          <div class="qr-info-box">
+            <p class="expiration-info-text"></p>
+            <p class="url-tip">💡 提示：連結較長時，您可以使用 reurl.cc 或 ppt.cc 等免費縮網址服務來縮短它。</p>
+          </div>
+
+          <div class="modal-actions">
+            <a href="#" id="preview-link-btn" target="_blank" class="btn btn-primary"><i data-lucide="external-link"></i> 直接開啟體驗</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ==============================================
+         2. 賀卡展示器 (Card Viewer View)
+         ============================================== -->
+    <div id="viewer-view" class="view-section hidden">
+      <!-- 漂浮氣球容器 -->
+      <div id="balloon-container" class="balloon-container"></div>
+      
+      <!-- 飄浮星塵/背景裝飾效果 -->
+      <div id="background-particles" class="bg-particles"></div>
+
+      <!-- 音樂播放器懸浮按鈕 -->
+      <div id="music-control" class="music-control-btn hidden">
+        <div class="vinyl-record">
+          <i data-lucide="music"></i>
+        </div>
+        <span class="tooltip-text">播放/暫停</span>
+      </div>
+
+      <!-- 收合的信封 (初始狀態) -->
+      <div id="opening-stage" class="opening-stage">
+        <div class="envelope-container-3d">
+          <div class="envelope-3d">
+            <div class="envelope-flap-3d"></div>
+            <div class="envelope-body-3d">
+              <div class="envelope-seal-3d">🎂</div>
+              <div class="to-label-3d">To: <span id="viewer-to-envelope">壽星</span></div>
+            </div>
+            <div class="envelope-paper-3d">
+              <div class="paper-brief">
+                <h3>Happy Birthday</h3>
+                <p>點擊信封開啟祝福...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 展開後的卡片主體舞台 -->
+      <div id="card-stage" class="card-stage hidden">
+        
+        <!-- 步驟 1: 閱讀精美卡片 -->
+        <section id="step-letter" class="card-viewer-step card-glass card-folded-content">
+          <div class="card-ribbon">🎀</div>
+          <div class="card-letter-content">
+            <h1 class="card-title-to">Dear <span id="viewer-to-name"></span>,</h1>
+            <div class="card-message" id="viewer-message"></div>
+            <p class="card-signature">From: <span id="viewer-from-name"></span></p>
+          </div>
+          <button id="goto-cake-btn" class="step-next-btn btn btn-primary">看我的精心準備 🎂</button>
+        </section>
+
+        <!-- 步驟 2: 許願吹蠟燭 -->
+        <section id="step-cake" class="card-viewer-step card-glass hidden">
+          <h2>🎂 許個願，把蠟燭吹熄吧！</h2>
+          <p class="instruction-subtitle">您可以用滑鼠點擊蠟燭，或點擊下方「啟用麥克風」直接吹熄！</p>
+          
+          <div class="cake-canvas-container">
+            <!-- CSS 生日蛋糕 -->
+            <div class="cake">
+              <div class="plate"></div>
+              <div class="layer layer-bottom"></div>
+              <div class="layer layer-middle"></div>
+              <div class="layer layer-top"></div>
+              <div class="icing"></div>
+              <div class="drip drip1"></div>
+              <div class="drip drip2"></div>
+              <div class="drip drip3"></div>
+              <!-- 蠟燭群 -->
+              <div class="candles-wrapper">
+                <div class="candle candle-1 active-candle" id="candle-1">
+                  <div class="flame"></div>
+                  <div class="smoke hidden"></div>
+                </div>
+                <div class="candle candle-2 active-candle" id="candle-2">
+                  <div class="flame"></div>
+                  <div class="smoke hidden"></div>
+                </div>
+                <div class="candle candle-3 active-candle" id="candle-3">
+                  <div class="flame"></div>
+                  <div class="smoke hidden"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="cake-controls">
+            <button id="mic-enable-btn" class="btn btn-secondary"><i data-lucide="mic"></i> 啟用麥克風吹蠟燭</button>
+            <p id="mic-status" class="mic-status-text"></p>
+          </div>
+          
+          <button id="goto-scratch-btn" class="step-next-btn btn btn-primary hidden">領取神秘禮物 🎁</button>
+        </section>
+
+        <!-- 步驟 3: 驚喜刮刮樂 -->
+        <section id="step-scratch" class="card-viewer-step card-glass hidden">
+          <h2>🎁 您的專屬生日驚喜</h2>
+          <p class="instruction-subtitle">用手指或滑鼠在下方灰色區域刮一刮，揭曉禮物兌換券！</p>
+          
+          <div class="scratch-card-container">
+            <!-- 刮開後顯示的底圖 (禮物券) -->
+            <div class="scratch-prize-card">
+              <div class="prize-ribbon">SPECIAL GIFT</div>
+              <h3>生日禮物兌換券</h3>
+              <p class="prize-title">憑此券可向 <span id="viewer-scratch-from"></span> 兌換：</p>
+              <div class="prize-value" id="viewer-scratch-prize">驚喜大餐一次</div>
+              <div class="prize-terms">※ 本券保證兌現，不可轉讓，隨時生效 😉</div>
+            </div>
+            
+            <!-- 覆蓋用的 HTML5 Canvas 刮刮布 -->
+            <canvas id="scratch-canvas" width="320" height="200"></canvas>
+          </div>
+          
+          <button id="goto-final-btn" class="step-next-btn btn btn-primary hidden">完成卡片開啟 🎉</button>
+        </section>
+
+        <!-- 步驟 4: 卡片結尾與祝福 -->
+        <section id="step-final" class="card-viewer-step card-glass hidden">
+          <div class="celebration-badge">🥳 Happy Birthday!</div>
+          <h2>卡片已完全開啟！</h2>
+          <p>願你擁有一個最棒的一天！氣球戳完了嗎？可以繼續點擊螢幕上方的飄浮氣球玩耍喔！</p>
+          
+          <div class="music-note-decor">🎵 🎈 🎂 🎉 🎁</div>
+
+          <div class="final-actions">
+            <button id="replay-btn" class="btn btn-secondary"><i data-lucide="rotate-ccw"></i> 重新體驗</button>
+            <button id="go-to-editor-btn" class="btn btn-primary"><i data-lucide="plus-circle"></i> 我也想做一張賀卡</button>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- HTML5 Audio 用於背景音樂 -->
+  <audio id="bg-music" loop preload="auto"></audio>
+
+  <!-- Core Scripts -->
+  <!-- 引入 Firebase SDK (載入 App 與 Firestore，使用 ES Module 機制在 app.js 中導入) -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>

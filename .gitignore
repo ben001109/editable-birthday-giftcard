@@ -1,0 +1,16 @@
+# OS temporary files
+.DS_Store
+Thumbs.db
+
+# IDE settings
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Local config changes (optional, but keep config.js in repo as template)
+# If the user wants to keep their keys private, they might ignore config.js,
+# but usually it's pushed as a template first. We'll keep config.js in git.
