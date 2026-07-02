@@ -2,21 +2,19 @@
 // ==========================================
 
 // 1. Firebase 設定
-// 請至 Firebase 控制台 (https://console.firebase.google.com/) 建立專案
-// 並在專案設定中建立一個 Web 應用程式，將產生的配置貼在下方：
+// 已成功設定您的專案：birthdaycard-8d6a9
 export const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDpMp2g4zX10aitRMwZ9DP8ROGGzCmC4xE",
+  authDomain: "birthdaycard-8d6a9.firebaseapp.com",
+  projectId: "birthdaycard-8d6a9",
+  storageBucket: "birthdaycard-8d6a9.firebasestorage.app",
+  messagingSenderId: "957762771812",
+  appId: "1:957762771812:web:dbc305e32314f589687871"
 };
 
 // 2. Clerk 身份驗證設定
-// 請至 Clerk 控制台 (https://clerk.com/) 建立專案
-// 在 API Keys 頁面複製 Publishable key 貼在下方：
-export const clerkPublishableKey = "YOUR_CLERK_PUBLISHABLE_KEY";
+// 已成功設定您的 Clerk 專案 Publishable Key
+export const clerkPublishableKey = "pk_test_cHJlcGFyZWQtaGFsaWJ1dC0yLmNsZXJrLmFjY291bnRzLmRldiQ";
 
 // ==========================================
 // 💡 指引：
@@ -29,7 +27,7 @@ export const clerkPublishableKey = "YOUR_CLERK_PUBLISHABLE_KEY";
 //   match /databases/{database}/documents {
 //     match /cards/{cardId} {
 //       // 任何人都可以讀取卡片（用於壽星拆信）
-//       // 建議加入時間判定，只有未過期的卡片才能讀取
+//       // 只有當前時間小於過期時間時，才允許讀取
 //       allow read: if resource == null || resource.data.expiresAt == null || resource.data.expiresAt > request.time;
 //       
 //       // 只有登入用戶（Clerk 同步）才能建立卡片
