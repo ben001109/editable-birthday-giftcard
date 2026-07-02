@@ -181,10 +181,20 @@ function initClerkAuth() {
           document.getElementById('creator-view').classList.add('hidden');
           document.getElementById('auth-view').classList.remove('hidden');
           
-          // 載入 Clerk Sign In 面板
+          // 載入 Clerk Sign In 面板 (設定深色外觀以搭配整體深色高質感 UI)
           window.Clerk.mountSignIn(document.getElementById('clerk-sign-in-mount'), {
             afterSignInUrl: window.location.href,
-            afterSignUpUrl: window.location.href
+            afterSignUpUrl: window.location.href,
+            appearance: {
+              variables: {
+                colorPrimary: '#ff6584',
+                colorBackground: '#1e293b',
+                colorText: '#f8fafc',
+                colorInputBackground: '#0f172a',
+                colorInputText: '#ffffff',
+                colorTextSecondary: '#94a3b8'
+              }
+            }
           });
         }
       });
